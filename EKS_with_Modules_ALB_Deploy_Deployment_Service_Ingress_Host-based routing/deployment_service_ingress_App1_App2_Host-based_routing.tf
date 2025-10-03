@@ -130,7 +130,7 @@ resource "kubernetes_ingress_v1" "apps_ingress" {
   }
   spec {
     rule {
-      host = "app1.mrcet.kozow.com"
+      host = "app1.krish.kozow.com"
       http {
         path {
           path     = "/"
@@ -148,7 +148,7 @@ resource "kubernetes_ingress_v1" "apps_ingress" {
     }
 
     rule {
-      host = "app2.mrcet.kozow.com"
+      host = "app2.krish.kozow.com"
       http {
         path {
           path     = "/"
