@@ -1,0 +1,270 @@
+############################################################
+# Namespace
+############################################################
+resource "kubernetes_namespace" "apps" {
+  metadata {
+    name = "apps"
+  }
+}
+
+############################################################
+# Main App Deployment and Service
+############################################################
+
+resource "kubernetes_deployment_v1" "nginx_main" {
+  metadata {
+    name      = "nginx-main"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    labels = {
+      app = "nginx-main"
+    }
+  }
+  spec {
+    replicas = 2
+    selector {
+      match_labels = {
+        app = "nginx-main"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "nginx-main"
+        }
+      }
+      spec {
+        container {
+          name  = "nginx-main"
+          image = "nginx:latest"
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "nginx_main_svc" {
+  metadata {
+    name      = "nginx-main-svc"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "nginx-main"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
+
+
+############################################################
+# App1 Deployment + Service
+############################################################
+resource "kubernetes_deployment_v1" "nginx_app1" {
+  metadata {
+    name      = "nginx-app1"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    labels = {
+      app = "nginx-app1"
+    }
+  }
+  spec {
+    replicas = 2
+    selector {
+      match_labels = {
+        app = "nginx-app1"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "nginx-app1"
+        }
+      }
+      spec {
+        container {
+          name  = "nginx-app1"
+          image = "nginx:latest"
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "nginx_app1_svc" {
+  metadata {
+    name      = "nginx-app1-svc"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "nginx-app1"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
+############################################################
+# App2 Deployment + Service
+############################################################
+resource "kubernetes_deployment_v1" "nginx_app2" {
+  metadata {
+    name      = "nginx-app2"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    labels = {
+      app = "nginx-app2"
+    }
+  }
+  spec {
+    replicas = 2
+    selector {
+      match_labels = {
+        app = "nginx-app2"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "nginx-app2"
+        }
+      }
+      spec {
+        container {
+          name  = "nginx-app2"
+          image = "httpd"
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "nginx_app2_svc" {
+  metadata {
+    name      = "nginx-app2"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "nginx-app2"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
+############################################################
+# Ingress with Host + Path Routing
+############################################################
+
+resource "kubernetes_ingress_v1" "nginx_combined_ingress" {
+  metadata {
+    name      = "nginx-combined-ingress"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    annotations = {
+      #"kubernetes.io/ingress.class"             = "alb"
+      "alb.ingress.kubernetes.io/scheme"        = "internet-facing"
+      "alb.ingress.kubernetes.io/target-type"   = "ip"
+    }
+  }
+  spec {
+    ingress_class_name = "alb"
+    # Host-based routing
+    rule {
+      host = "app1.mrcet.kozow.com"
+      http {
+        path {
+          path     = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.nginx_app1_svc.metadata[0].name
+              port {
+                number = 80
+              }
+            }
+          }
+        }
+      }
+    }
+
+    rule {
+      host = "app2.mrcet.kozow.com"
+      http {
+        path {
+          path     = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.nginx_app2_svc.metadata[0].name
+              port {
+                number = 80
+              }
+            }
+          }
+        }
+      }
+    }
+    #Main host with path-based routing
+    rule {
+      host = "mrcet.kozow.com"
+          #host = "main.mrcet.kozow.com"
+      http {
+        # Root app
+        path {
+          path      = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.nginx_main_svc.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+
+        # App1 under /app1 like mrcet.kozow.com/app1 OR main.mrcet.kozow.com/app1
+        path {
+          path      = "/app1"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.nginx_app1_svc.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+
+        # App2 under /app2 like mrcet.kozow.com/app2 OR main.mrcet.kozow.com/app2
+        path {
+          path      = "/app2"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.nginx_app2_svc.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
