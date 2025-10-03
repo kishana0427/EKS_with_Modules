@@ -39,7 +39,7 @@ resource "kubernetes_service" "nginx_app1_svc" {
       port        = 80
       target_port = 80
     }
-    type = "LoadBalancer"
+    type = "ClusterIP"
   }
 }
 
@@ -80,7 +80,7 @@ resource "kubernetes_service" "nginx_app2_svc" {
       port        = 80
       target_port = 80
     }
-    type = "LoadBalancer"
+    type = "ClusterIP"
   }
 }
 
@@ -138,3 +138,4 @@ resource "kubernetes_ingress_v1" "nginx_host_ingress" {
   }
 
 }
+
