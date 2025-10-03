@@ -159,3 +159,5 @@ internet-facing scheme for public access.
 target-type: ip for pod IP targets.
 
 Update your DNS records to point app1.example.com and app2.example.com to the ALB once it’s created.
+
+
