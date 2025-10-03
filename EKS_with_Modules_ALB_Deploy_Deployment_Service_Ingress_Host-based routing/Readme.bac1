@@ -1,0 +1,327 @@
+Here’s a full working Terraform example that deploys two apps (app1 and app2) with 
+host-based routing using AWS Load Balancer Controller (alb ingress class).
+
+```hcl
+############################################################
+# Providers
+############################################################
+terraform {
+  required_version = ">= 1.5.7"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 6.13"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.30"
+    }
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+############################################################
+# Namespace
+############################################################
+resource "kubernetes_namespace" "apps" {
+  metadata {
+    name = "apps"
+  }
+}
+
+############################################################
+# App1 Deployment + Service
+############################################################
+resource "kubernetes_deployment_v1" "app1" {
+  metadata {
+    name      = "app1"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    labels = {
+      app = "app1"
+    }
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "app1"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "app1"
+        }
+      }
+      spec {
+        container {
+          name  = "app1"
+          image = "nginx"
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "app1" {
+  metadata {
+    name      = "app1"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "app1"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
+############################################################
+# App2 Deployment + Service
+############################################################
+resource "kubernetes_deployment_v1" "app2" {
+  metadata {
+    name      = "app2"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    labels = {
+      app = "app2"
+    }
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "app2"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "app2"
+        }
+      }
+      spec {
+        container {
+          name  = "app2"
+          image = "httpd"
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "app2" {
+  metadata {
+    name      = "app2"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "app2"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
+############################################################
+# Ingress with Host-Based Routing (AWS ALB)
+############################################################
+resource "kubernetes_ingress_v1" "apps_ingress" {
+  metadata {
+    name      = "apps-ingress"
+    namespace = kubernetes_namespace.apps.metadata[0].name
+    annotations = {
+      "kubernetes.io/ingress.class"             = "alb"
+      "alb.ingress.kubernetes.io/scheme"        = "internet-facing"
+      "alb.ingress.kubernetes.io/target-type"   = "ip"
+    }
+  }
+  spec {
+    rule {
+      host = "app1.mrcet.kozow.com"
+      http {
+        path {
+          path     = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.app1.metadata[0].name
+              port {
+                number = 80
+              }
+            }
+          }
+        }
+      }
+    }
+
+    rule {
+      host = "app2.mrcet.kozow.com"
+      http {
+        path {
+          path     = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.app2.metadata[0].name
+              port {
+                number = 80
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+✅ Steps to make it work:
+
+Apply this Terraform code (terraform apply).
+
+Get the ingress external ALB address:
+
+kubectl get ingress -n apps
+
+
+Update your DNS records:
+
+app1.mrcet.kozow.com → CNAME → <ALB-DNS>
+
+app2.mrcet.kozow.com → CNAME → <ALB-DNS>
+
+Access:
+
+http://app1.mrcet.kozow.com
+ → nginx page
+
+http://app2.mrcet.kozow.com
+ → httpd page
+
+ Do you want me to also give you a minimal DNS setup guide for kozow.com so you can 
+ verify that app1 and app2 point correctly to the ALB?
+
+ 👍 The last error came up because your Ingress was trying to reference services 
+ (app1, app2) that didn’t exist in Terraform yet. I’ve now given you a full working Terraform config with:
+
+✅ app1 (nginx) deployment + service
+
+✅ app2 (httpd) deployment + service
+
+✅ Namespace apps
+
+✅ ALB ingress with host-based routing (app1.mrcet.kozow.com, app2.mrcet.kozow.com)
+
+Check the block I left in Terraform Code for Two Apps with Host-Based Routing on EKS (id 49025).
+
+👉 Before applying, make sure:
+
+The AWS Load Balancer Controller Helm chart is already installed in your cluster.
+
+If not, I can give you the helm_release block for it.
+
+The DNS records app1.mrcet.kozow.com and app2.mrcet.kozow.com point to the ALB address created by the ingress.
+
+Do you want me to also include the AWS Load Balancer Controller Helm release in the 
+same Terraform so everything is deployable end-to-end?
+
+
+Now I’ll extend your existing code to include the AWS Load Balancer Controller 
+Helm release with the correct IRSA setup, so your Ingress using alb works end-to-end.
+
+Here’s the full addition that plugs into your current Terraform:
+
+############################################################
+# IRSA Role for AWS Load Balancer Controller
+############################################################
+module "aws_load_balancer_controller_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name                              = "aws-load-balancer-controller"
+  attach_load_balancer_controller_policy = true
+
+  oidc_providers = {
+    eks = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
+  }
+}
+
+############################################################
+# Kubernetes Service Account (IRSA)
+############################################################
+resource "kubernetes_service_account" "aws_lb_controller" {
+  metadata {
+    name      = "aws-load-balancer-controller"
+    namespace = "kube-system"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = module.aws_load_balancer_controller_irsa_role.iam_role_arn
+    }
+  }
+}
+
+############################################################
+# Helm Release: AWS Load Balancer Controller
+############################################################
+resource "helm_release" "aws_load_balancer_controller" {
+  name       = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+
+  set = [
+    {
+      name  = "clusterName"
+      value = module.eks.cluster_name
+    },
+    {
+      name  = "serviceAccount.create"
+      value = "false"
+    },
+    {
+      name  = "serviceAccount.name"
+      value = "aws-load-balancer-controller"
+    },
+    {
+      name  = "region"
+      value = "ap-south-1"
+    },
+    {
+      name  = "vpcId"
+      value = module.vpc.vpc_id
+    }
+  ]
+
+  depends_on = [
+    module.aws_load_balancer_controller_irsa_role,
+    kubernetes_service_account.aws_lb_controller
+  ]
+}
+
