@@ -35,7 +35,7 @@ resource "kubernetes_service" "nginx_main_svc" {
       port        = 80
       target_port = 80
     }
-    type = "NodePort"
+    type = "LoadBalancer"
   }
 }
 
@@ -74,7 +74,7 @@ resource "kubernetes_service" "nginx_app1_svc" {
       port        = 80
       target_port = 80
     }
-    type = "NodePort"
+    type = "LoadBalancer"
   }
 }
 
@@ -112,7 +112,7 @@ resource "kubernetes_service" "nginx_app2_svc" {
       port        = 80
       target_port = 80
     }
-    type = "NodePort"
+    type = "LoadBalancer"
   }
 }
 
@@ -167,4 +167,5 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
       }
     }
   }
+
 }
