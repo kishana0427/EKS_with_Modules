@@ -75,9 +75,6 @@ module "vpc" {
 ############################################################
 # EKS Cluster + Node Group
 ############################################################
-resource "aws_iam_service_linked_role" "eks_nodegroup" {
-  aws_service_name = "eks-nodegroup.amazonaws.com"
-}
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
@@ -180,6 +177,12 @@ resource "kubernetes_service_account" "aws_lb_controller" {
       "eks.amazonaws.com/role-arn" = module.aws_load_balancer_controller_irsa_role.iam_role_arn
     }
   }
+}
+
+
+
+resource "aws_iam_service_linked_role" "eks_nodegroup" {
+  aws_service_name = "eks-nodegroup.amazonaws.com"
 }
 
 ############################################################
@@ -459,4 +462,5 @@ resource "aws_acm_certificate_validation" "app_cert_validation" {
 #    }
 #  }
 #}
+
 
