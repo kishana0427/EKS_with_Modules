@@ -397,7 +397,7 @@ resource "aws_acm_certificate_validation" "app_cert_validation" {
 #    aws_route53_record.cert_validation_app.fqdn,
 #    aws_route53_record.cert_validation_api.fqdn
 #  ]
-}
+#}
 
 
 # ---------------- Listeners ----------------
@@ -462,5 +462,6 @@ resource "aws_acm_certificate_validation" "app_cert_validation" {
 #    }
 #  }
 #}
+
 
 
