@@ -277,7 +277,7 @@ resource "kubernetes_service" "nginx_main_svc" {
       port        = 80
       target_port = 80
     }
-    type = "LoadBalancer"
+    type = "ClusterIP"
   }
 }
 
@@ -373,6 +373,7 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
   spec {
     ingress_class_name = "alb"
     rule {
+      host = "mrcet.kozow.com"
       http {
         path {
           path      = "/"
@@ -384,7 +385,7 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
             }
           }
         }
-       
+
         path {
           path      = "/app1"
           path_type = "Prefix"
@@ -415,14 +416,14 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
 # ---------------- ACM Certificate ----------------
 ###################################################
 
-resource "aws_acm_certificate" "app_cert" {
-  domain_name       = "mrcet.kozow.com" # replace with your domain
-  validation_method = "DNS"
-}
+#resource "aws_acm_certificate" "app_cert" {
+#  domain_name       = "mrcet.kozow.com" # replace with your domain
+#  validation_method = "DNS"
+#}
 
-resource "aws_acm_certificate_validation" "app_cert_validation" {
-  certificate_arn = aws_acm_certificate.app_cert.arn
-}
+#resource "aws_acm_certificate_validation" "app_cert_validation" {
+#  certificate_arn = aws_acm_certificate.app_cert.arn
+#}
 
 
 
@@ -527,4 +528,3 @@ resource "aws_acm_certificate_validation" "app_cert_validation" {
 #    }
 #  }
 #}
-
