@@ -58,10 +58,12 @@ module "vpc" {
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1
+    "kubernetes.io/cluster/my-cluster" = "shared"
   }
 
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
+    "kubernetes.io/cluster/my-cluster" = "shared"
   }
 
   tags = {
@@ -340,3 +342,4 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
     }
   }
 }
+
