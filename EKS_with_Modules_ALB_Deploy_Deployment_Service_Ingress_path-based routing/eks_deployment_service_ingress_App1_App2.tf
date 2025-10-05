@@ -181,9 +181,24 @@ resource "kubernetes_service_account" "aws_lb_controller" {
 
 
 
-resource "aws_iam_service_linked_role" "eks_nodegroup" {
-  aws_service_name = "eks-nodegroup.amazonaws.com"
-}
+#resource "aws_iam_service_linked_role" "eks_nodegroup" {
+#  aws_service_name = "eks-nodegroup.amazonaws.com"
+#}
+
+#🔄 If you still want to manage it explicitly
+
+#Add a count condition so Terraform only creates it if it doesn’t exist:
+
+#resource "aws_iam_service_linked_role" "eks_nodegroup" {
+#  count            = length(data.aws_iam_service_linked_role.eks_nodegroup) == 0 ? 1 : 0
+#  aws_service_name = "eks-nodegroup.amazonaws.com"
+#}
+
+#data "aws_iam_service_linked_role" "eks_nodegroup" {
+#  service_name = "eks-nodegroup.amazonaws.com"
+#}
+
+
 
 ############################################################
 # Helm Release: AWS Load Balancer Controller
@@ -262,7 +277,7 @@ resource "kubernetes_service" "nginx_app1_svc" {
       port        = 80
       target_port = 80
     }
-    type = "NodePort"
+    type = "ClusterIP"
   }
 }
 
@@ -300,7 +315,7 @@ resource "kubernetes_service" "nginx_app2_svc" {
       port        = 80
       target_port = 80
     }
-    type = "NodePort"
+    type = "ClusterIP"
   }
 }
 
@@ -318,6 +333,7 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
   }
 
   spec {
+    ingress_class_name = "alb"
     rule {
       http {
         path {
@@ -462,6 +478,3 @@ resource "aws_acm_certificate_validation" "app_cert_validation" {
 #    }
 #  }
 #}
-
-
-
