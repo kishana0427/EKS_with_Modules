@@ -1,0 +1,42 @@
+Problem:
+=======
+kubectl get ingress
+NAME                 CLASS   HOSTS   ADDRESS   PORTS   AGE
+nginx-path-ingress   alb     *                 80      9m46s
+
+Solution:
+========
+Step 2: Check IAM Service-Linked Role
+
+The ALB Ingress Controller needs this IAM role to manage ALBs:
+
+aws iam get-role --role-name AWSServiceRoleForElasticLoadBalancing
+
+If it says role not found, create it manually:
+
+aws iam create-service-linked-role --aws-service-name elasticloadbalancing.amazonaws.com
+
+Then confirm:
+
+aws iam list-roles | grep ElasticLoadBalancing
+
+Step 4: (Optional) Retry After Enablement
+
+Once AWS enables ELB access:
+
+Delete your old Ingress:
+
+kubectl delete ingress nginx-path-ingress
+
+Reapply it:
+
+kubectl apply -f your-ingress.yaml
+
+
+Then check again:
+
+kubectl get ingress
+
+
+You should see the ADDRESS field populated within a few minutes.
+
