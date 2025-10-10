@@ -32,7 +32,7 @@ terraform {
 # Providers
 ############################################################
 provider "aws" {
-  region = "ap-south-1"
+  region = "us-east-1"
 }
 
 provider "time" {}
@@ -49,13 +49,14 @@ module "vpc" {
   name = "my-vpc"
   cidr = "10.0.0.0/16"
 
-  azs             = ["ap-south-1a", "ap-south-1b"]
+  azs             = ["us-east-1a", "us-east-1b"]
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
 
-  enable_nat_gateway      = false
-  map_public_ip_on_launch = true
-
+  enable_nat_gateway      = true
+  #map_public_ip_on_launch = true
+  enable_dns_hostnames = true
+  single_nat_gateway   = true
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1
     "kubernetes.io/cluster/my-cluster" = "shared"
@@ -94,7 +95,7 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   vpc_id                   = module.vpc.vpc_id
-  subnet_ids               = module.vpc.public_subnets
+  subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
   eks_managed_node_groups = {
@@ -224,7 +225,7 @@ resource "helm_release" "aws_load_balancer_controller" {
     },
     {
       name  = "region"
-      value = "ap-south-1"
+      value = "us-east-1"
     },
     {
       name  = "vpcId"
@@ -239,21 +240,21 @@ resource "helm_release" "aws_load_balancer_controller" {
 
 }
 
-############################################################
+##########m#################################################
 # Nginx Deployments, Services & Ingress
 ############################################################
 
-# Main App ("/")
-resource "kubernetes_deployment" "nginx_main" {
+# Main App
+resource "kubernetes_deployment" "main_app" {
   metadata {
-    name = "nginx-main"
-    labels = { app = "nginx-main" }
+    name = "main-app"
+    labels = { app = "main-app" }
   }
   spec {
     replicas = 1
-    selector { match_labels = { app = "nginx-main" } }
+    selector { match_labels = { app = "main-app" } }
     template {
-      metadata { labels = { app = "nginx-main" } }
+      metadata { labels = { app = "main-app" } }
       spec {
         container {
           name  = "nginx"
@@ -265,13 +266,13 @@ resource "kubernetes_deployment" "nginx_main" {
   }
 }
 
-resource "kubernetes_service" "nginx_main_svc" {
+resource "kubernetes_service" "main_app_svc" {
   metadata {
-    name = "nginx-main-svc"
+    name = "main-app-svc"
   }
   spec {
     selector = {
-      app = "nginx-main"
+      app = "main-app"
     }
     port {
       port        = 80
@@ -280,6 +281,8 @@ resource "kubernetes_service" "nginx_main_svc" {
     type = "ClusterIP"
   }
 }
+
+
 
 # App1
 resource "kubernetes_deployment" "nginx_app1" {
@@ -373,18 +376,18 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
   spec {
     ingress_class_name = "alb"
     rule {
-      host = "mrcet.kozow.com"
       http {
         path {
           path      = "/"
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.nginx_main_svc.metadata[0].name
+              name = kubernetes_service.main_app_svc.metadata[0].name
               port { number = 80 }
             }
           }
         }
+
 
         path {
           path      = "/app1"
@@ -416,14 +419,14 @@ resource "kubernetes_ingress_v1" "nginx_path_ingress" {
 # ---------------- ACM Certificate ----------------
 ###################################################
 
-#resource "aws_acm_certificate" "app_cert" {
-#  domain_name       = "mrcet.kozow.com" # replace with your domain
-#  validation_method = "DNS"
-#}
+resource "aws_acm_certificate" "app_cert" {
+  domain_name       = "mrcet.kozow.com" # replace with your domain
+  validation_method = "DNS"
+}
 
-#resource "aws_acm_certificate_validation" "app_cert_validation" {
-#  certificate_arn = aws_acm_certificate.app_cert.arn
-#}
+resource "aws_acm_certificate_validation" "app_cert_validation" {
+  certificate_arn = aws_acm_certificate.app_cert.arn
+}
 
 
 
