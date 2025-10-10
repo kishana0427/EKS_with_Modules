@@ -1,0 +1,137 @@
+Problem:
+=======
+kubectl get ingress
+NAME                 CLASS   HOSTS   ADDRESS   PORTS   AGE
+nginx-path-ingress   alb     *                 80      9m46s
+
+Solution:
+========
+Step 2: Check IAM Service-Linked Role
+
+The ALB Ingress Controller needs this IAM role to manage ALBs:
+
+aws iam get-role --role-name AWSServiceRoleForElasticLoadBalancing
+
+If it says role not found, create it manually:
+
+aws iam create-service-linked-role --aws-service-name elasticloadbalancing.amazonaws.com
+
+Then confirm:
+
+aws iam list-roles | grep ElasticLoadBalancing
+
+Step 4: (Optional) Retry After Enablement
+
+Once AWS enables ELB access:
+
+Delete your old Ingress:
+
+kubectl delete ingress nginx-path-ingress
+
+Reapply it:
+
+kubectl apply -f your-ingress.yaml
+
+
+Then check again:
+
+kubectl get ingress
+
+
+You should see the ADDRESS field populated within a few minutes.
+
+
+🔍 Root Cause
+
+The critical part of your log is this:
+
+OperationNotPermitted: This AWS account currently does not support creating load balancers. For more information, please contact AWS Support.
+
+That means your AWS account is restricted from creating Elastic Load Balancers (ELB/ALB/NLB) — not a configuration or permission issue in Kubernetes or Terraform.
+
+💡 Why This Happens
+
+AWS disables load balancer creation in certain cases:
+
+New or free-tier accounts — new AWS accounts sometimes have ELB creation disabled until verified.
+
+Region restrictions — some accounts are limited to specific regions (e.g., you can create EC2s in us-east-1 but not ELBs).
+
+Service Quota or permission issue — the service-linked role for ALB (AWSServiceRoleForElasticLoadBalancing) might not exist or be corrupted.
+
+Account suspension or unpaid bills — AWS may block resource creation.
+
+✅ Step-by-Step Fix
+Step 1: Verify Account Supports ELB
+
+Run this in your terminal:
+aws elbv2 describe-account-limits --region us-east-1
+
+If it returns something like:
+
+An error occurred (OperationNotPermitted) when calling the DescribeAccountLimits operation
+
+→ Your account is not yet authorized to use ELB.
+
+In that case, you must contact AWS Support to enable it.
+
+👉 Go to:
+https://support.console.aws.amazon.com/support/home#/case/create
+
+If it says role not found, create it manually:
+
+aws iam create-service-linked-role --aws-service-name elasticloadbalancing.amazonaws.com
+
+Then confirm:
+
+aws iam list-roles | grep ElasticLoadBalancing
+
+Step 3: Verify Region and Quotas
+
+Make sure you’re in the correct region:
+
+aws configure get region
+
+If it’s not us-east-1, set it:
+
+aws configure set region us-east-1
+
+Then check ALB quotas:
+
+aws service-quotas get-service-quota \
+  --service-code elasticloadbalancing \
+  --quota-code L-53DA6B97 \
+  --region us-east-1
+
+That quota should show at least 5 for Application Load Balancers per region.
+
+Step 4: (Optional) Retry After Enablement
+
+Once AWS enables ELB access:
+
+Delete your old Ingress:
+
+kubectl delete ingress nginx-path-ingress
+
+Reapply it:
+kubectl apply -f your-ingress.yaml
+
+Then check again:
+kubectl get ingress
+
+You should see the ADDRESS field populated within a few minutes.
+
+⚙️ Summary
+
+| Issue                                                                                        | Fix                                                                                                    |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `OperationNotPermitted: This AWS account currently does not support creating load balancers` | Contact AWS Support to enable ELB service                                                              |
+| `no endpoints available for service "aws-load-balancer-webhook-service"`                     | The ALB controller webhook didn’t start because it failed to create ALB — will auto-fix once ALB works |
+| Wrong region                                                                                 | Set region to `us-east-1` in AWS CLI and Terraform                                                     |
+
+If you want, you can show me the output of:
+
+aws sts get-caller-identity
+aws elbv2 describe-account-limits --region us-east-1
+
+and I’ll tell you whether it’s an account restriction or IAM/service-linked role issue.
